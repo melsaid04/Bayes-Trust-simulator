@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Bayesian Trust Simulator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 760px;
+      margin: 25px auto;
+      padding: 18px;
+      line-height: 1.6;
+      background: #fafafa;
+      color: #222;
+    }
+
+    .box {
+      background: white;
+      padding: 22px;
+      border-radius: 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      margin-bottom: 8px;
+      font-size: 1.8em;
+    }
+
+    .subtitle {
+      color: #555;
+      margin-top: 0;
+    }
+
+    label {
+      display: block;
+      margin-top: 18px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 90px;
+      padding: 8px;
+      margin-top: 6px;
+      font-size: 1em;
+    }
+
+    .button-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      padding: 12px 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 0.98em;
+      cursor: pointer;
+      background: #eeeeee;
+    }
+
+    button:hover {
+      background: #dddddd;
+    }
+
+    .primary {
+      background: #222;
+      color: white;
+      margin-top: 20px;
+    }
+
+    .primary:hover {
+      background: #444;
+    }
+
+    .result {
+      margin-top: 26px;
+      padding: 20px;
+      border-radius: 14px;
+      background: #f1f1f1;
+      font-size: 1.12em;
+    }
+
+    .small {
+      font-size: 0.9em;
+      color: #555;
+    }
+
+    .quote {
+      margin-top: 16px;
+      font-style: italic;
+      opacity: 0.8;
+    }
+
+    .history {
+      margin-top: 20px;
+      padding: 14px;
+      background: #fbfbfb;
+      border: 1px solid #e5e5e5;
+      border-radius: 12px;
+      font-size: 0.95em;
+    }
+
+    .history ul {
+      padding-left: 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="box">
+
+<h1>🤝 Bayesian Trust Simulator</h1>
+
+<p class="subtitle">
+Update trust using evidence instead of overreacting to one event.
+</p>
+
+<p>
+Bayesian thinking asks:
+<strong>“How much should this new behavior actually change my mind?”</strong>
+</p>
+
+<label>
+Current trust level:
+</label>
+<input id="prior" type="number" value="70" min="0" max="100"> %
+
+<p class="small">
+Pick an evidence button below, or manually edit the probabilities.
+</p>
+
+<div class="button-grid">
+  <button onclick="setEvidence('Kept a promise', 90, 25)">✅ Kept a promise</button>
+  <button onclick="setEvidence('Helped when inconvenient', 85, 20)">🫶 Helped when inconvenient</button>
+  <button onclick="setEvidence('Apologized sincerely', 75, 35)">🙏 Apologized sincerely</button>
+  <button onclick="setEvidence('Was honest about something hard', 88, 18)">🧭 Honest when it was hard</button>
+  <button onclick="setEvidence('Canceled plans once', 45, 60)">📅 Canceled plans once</button>
+  <button onclick="setEvidence('Ghosted you', 20, 75)">👻 Ghosted you</button>
+  <button onclick="setEvidence('Lied or hid something', 15, 85)">🚩 Lied or hid something</button>
+  <button onclick="setEvidence('Repeated the same hurtful behavior', 10, 90)">🔁 Repeated harmful pattern</button>
+</div>
+
+<label>
+Selected evidence:
+</label>
+<div id="selectedEvidence"><strong>Kept a promise</strong></div>
+
+<label>
+How likely is this behavior IF they are trustworthy?
+</label>
+<input id="evidenceTrust" type="number" value="90" min="0" max="100"> %
+
+<label>
+How likely is this behavior IF they are NOT trustworthy?
+</label>
+<input id="evidenceNotTrust" type="number" value="25" min="0" max="100"> %
+
+<br>
+
+<button class="primary" onclick="calculateTrust(true)">
+Update Trust
+</button>
+
+<button onclick="resetSimulator()">
+Reset
+</button>
+
+<div class="result" id="result">
+Your updated trust estimate will appear here.
+</div>
+
+<div class="history" id="history">
+<strong>Evidence history:</strong>
+<ul id="historyList"></ul>
+</div>
+
+</div>
+
+<script>
+
+let currentEvidenceName = "Kept a promise";
+let historyItems = [];
+
+function setEvidence(name, ifTrustworthy, ifNotTrustworthy) {
+  currentEvidenceName = name;
+  document.getElementById("selectedEvidence").innerHTML =
+    "<strong>" + name + "</strong>";
+
+  document.getElementById("evidenceTrust").value = ifTrustworthy;
+  document.getElementById("evidenceNotTrust").value = ifNotTrustworthy;
+
+  calculateTrust(false);
+}
+
+function calculateTrust(addToHistory) {
+  const prior =
+    Number(document.getElementById("prior").value) / 100;
+
+  const evidenceTrust =
+    Number(document.getElementById("evidenceTrust").value) / 100;
+
+  const evidenceNotTrust =
+    Number(document.getElementById("evidenceNotTrust").value) / 100;
+
+  if (prior < 0 || prior > 1 || evidenceTrust < 0 || evidenceTrust > 1 || evidenceNotTrust < 0 || evidenceNotTrust > 1) {
+    document.getElementById("result").innerHTML =
+      "Please enter numbers between 0 and 100.";
+    return;
+  }
+
+  const notPrior = 1 - prior;
+
+  const evidenceProbability =
+    (evidenceTrust * prior) +
+    (evidenceNotTrust * notPrior);
+
+  if (evidenceProbability === 0) {
+    document.getElementById("result").innerHTML =
+      "This evidence has zero probability under both assumptions, so Bayes cannot update.";
+    return;
+  }
+
+  const posterior =
+    (evidenceTrust * prior) / evidenceProbability;
+
+  const percent = (posterior * 100).toFixed(1);
+  const priorPercent = (prior * 100).toFixed(1);
+
+  let interpretation = "";
+
+  if (posterior > 0.85) {
+    interpretation = "🟢 Strong evidence of trustworthiness.";
+  }
+  else if (posterior > 0.60) {
+    interpretation = "🟡 Moderately trustworthy, but uncertainty remains.";
+  }
+  else if (posterior > 0.40) {
+    interpretation = "⚠️ Mixed evidence. Avoid overconfidence.";
+  }
+  else {
+    interpretation = "🔴 Significant reason for caution.";
+  }
+
+  document.getElementById("result").innerHTML = `
+    <strong>Updated Trust Estimate:</strong><br><br>
+
+    Before evidence: ${priorPercent}%<br>
+    After evidence: <strong>🤝 ${percent}%</strong>
+
+    <br><br>
+
+    Evidence used: <strong>${currentEvidenceName}</strong>
+
+    <br><br>
+
+    ${interpretation}
+
+    <div class="quote">
+      Bayesian wisdom: one event should inform your judgment, not completely control it.
+    </div>
+
+    <p class="small">
+      Formula: P(trustworthy | evidence) =
+      P(evidence | trustworthy) × P(trustworthy) ÷ P(evidence)
+    </p>
+  `;
+
+  if (addToHistory) {
+    historyItems.push(`${currentEvidenceName}: ${priorPercent}% → ${percent}%`);
+    updateHistory();
+
+    // Make the posterior become the new prior for the next piece of evidence.
+    document.getElementById("prior").value = percent;
+  }
+}
+
+function updateHistory() {
+  const list = document.getElementById("historyList");
+  list.innerHTML = "";
+
+  historyItems.forEach(item => {
+    const li = document.createElement("li");
+    li.textContent = item;
+    list.appendChild(li);
+  });
+}
+
+function resetSimulator() {
+  document.getElementById("prior").value = 70;
+  setEvidence("Kept a promise", 90, 25);
+  historyItems = [];
+  updateHistory();
+  calculateTrust(false);
+}
+
+calculateTrust(false);
+
+</script>
+
+</body>
+</html>
